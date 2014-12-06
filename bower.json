@@ -1,0 +1,19 @@
+{
+  "name": "chrome-dexcom-memory",
+  "version": "0.0.0",
+  "authors": [
+    "Ben West <bewest@gmail.com>"
+  ],
+  "license": "GPL",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "solarized": "git://github.com/jjt/bower-solarized.git#~0.1.2",
+    "jquery": "~2.1.1"
+  }
+}
