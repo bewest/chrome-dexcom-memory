@@ -133,6 +133,10 @@ function do_updates (ev, list) {
   rows.exit( ).remove( );
 }
 
+function identify_device (ev, data, i) {
+  console.log("identify_device", arguments, ev.target);
+}
+
 function init ( ) {
   console.log('initing app');
   $('#download_1').on('click', do_download);
@@ -140,6 +144,7 @@ function init ( ) {
   var instr = $('.instruments');
   instr.on('update', do_updates);
   $(".v.switchcheck").bootstrapSwitch( );
+  $('.instruments').on('detected', identify_device);
   poll($('#auto_poll'));
 }
 $(window).ready(init);
