@@ -1,8 +1,13 @@
 
-var $ = require('jquery');
+var $ = window.jQuery = window.$ = require('jquery');
+var bswitch = require('bootstrap-switch');
+// var bswitch = require('../../bower_components/bootstrap-switch/dist/js/bootstrap-switch.min.js');
+var d3 = require('d3');
 var Buffer = require('buffer').Buffer;
 var Zip = require('adm-zip');
 var saveAs = require('browser-filesaver');
+var dexcom = require('dexcom-uart');
+var serial = require('serial-chromeify');
 
 console.log('app.js');
 
@@ -73,10 +78,69 @@ function do_zip_download ( ) {
   history.append(cloned);
 }
 
+function poll (control) {
+  var instr = $('.instruments');
+  function scanned (err, list) {
+    console.log('scanned serial', err, list);
+    if (!err) {
+      instr.trigger('update', list);
+    }
+  }
+  function poller ( ) {
+    serial.scan(scanned);
+  }
+  // var interval = setInterval(poller, 1000);
+  var interval = null;
+  function control_interval (ev, state) {
+    console.log('UPDATING POLL STATUS', arguments);
+    if (!control.is(':checked')) {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    } else {
+      if (!interval) {
+        interval = setInterval(poller, 1000);
+      }
+
+    }
+  }
+  control.on('change init switchChange.bootstrapSwitch', control_interval);
+  control.trigger('init');
+}
+
+function do_updates (ev, list) {
+  console.log("DRAW UPDATED", list);
+  var instr = d3.select('.instruments');
+  var cloned = $(instr.select('.skeleton.template')[0])
+    .clone(true)
+    .removeClass('skeleton')
+    .addClass('row')
+    ;
+  var rows = instr.selectAll('.row')
+    .data(list.ports);
+  ;
+  rows.enter( ).append(function (data, i) {
+    var dup = cloned.clone(true);
+    dup.find('.device').text(data);
+    // d3.select(this).append(d3.select(dup.get( )));
+    console.log('each', data, i, this, dup.get( )[0]);
+    return dup.get( )[0];
+  }).each(function iter (data, i) {
+    console.log('tapped?', this, data);
+    $(this).trigger('detected', data, i);
+  });
+  rows.exit( ).remove( );
+}
+
 function init ( ) {
   console.log('initing app');
   $('#download_1').on('click', do_download);
   $('#download_2').on('click', do_zip_download);
+  var instr = $('.instruments');
+  instr.on('update', do_updates);
+  $(".v.switchcheck").bootstrapSwitch( );
+  poll($('#auto_poll'));
 }
 $(window).ready(init);
 
