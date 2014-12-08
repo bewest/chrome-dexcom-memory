@@ -81,7 +81,6 @@ function do_zip_download ( ) {
 function poll (control) {
   var instr = $('.instruments');
   function scanned (err, list) {
-    console.log('scanned serial', err, list);
     if (!err) {
       instr.trigger('update', list);
     }
@@ -110,7 +109,6 @@ function poll (control) {
 }
 
 function do_updates (ev, list) {
-  console.log("DRAW UPDATED", list);
   var instr = d3.select('.instruments');
   var cloned = $(instr.select('.skeleton.template')[0])
     .clone(true)
@@ -133,8 +131,60 @@ function do_updates (ev, list) {
   rows.exit( ).remove( );
 }
 
+function inspect (device) {
+
+  var row = $(device.dom);
+  this
+    .readHardwareBoard(function (err, header) {
+      row.append($("<section/>").addClass('hardwareboard').html(header));
+    })
+    .readFirmwareHeader(function (err, header) {
+      row.append($("<section/>").addClass('firmwareheader').html(header));
+      console.log('header', header);
+    })
+    .getEGVPageRange(function (err, range) {
+      console.log('RANGE', range);
+      row.append(
+        $('<section/>')
+          .addClass('range')
+          .append(
+            $('<tt/>')
+              .addClass('start')
+              .text(range.start)
+          )
+          .append(
+            $('<tt/>')
+              .addClass('end')
+              .text(range.end)
+          )
+      ) ;
+    })
+    .ReadDatabasePartitions(function (err, partitions) {
+      console.log(partitions);
+      row.append(
+        $('<section/>')
+          .addClass('partitions')
+          .html(partitions)
+      ) ;
+      $('#tmp').text(partitions);
+    })
+    ;
+}
+
 function identify_device (ev, data, i) {
-  console.log("identify_device", arguments, ev.target);
+  console.log("identify_device", data, arguments, ev.target);
+  var conn = serial.acquire(data, function opened (device) {
+    console.log("HAHAHA opened DEV", device);
+    var tx = dexcom(conn);
+    tx.dom = ev.target;
+    tx.api
+      .ping(console.log.bind(console, 'PING'))
+      .readFirmwareSettings(console.log.bind(console, 'readFirmwareSettings'))
+      .tap(function ( ) {
+        inspect.call(this, tx);
+    });
+  });
+  console.log('SERIAL', ser);
 }
 
 function init ( ) {
