@@ -6,6 +6,7 @@ var d3 = require('d3');
 var Buffer = require('buffer').Buffer;
 var Zip = require('adm-zip');
 var saveAs = require('browser-filesaver');
+var es = require('event-stream');
 var dexcom = require('dexcom-uart');
 var serial = require('serial-chromeify');
 
@@ -134,6 +135,8 @@ function do_updates (ev, list) {
 function inspect (device) {
 
   var row = $(device.dom);
+  var zip = new Zip;
+  var name = "dexcom_download.zip";
   this
     .readHardwareBoard(function (err, header) {
       row.append($("<section/>").addClass('hardwareboard').html(header));
@@ -158,6 +161,21 @@ function inspect (device) {
               .text(range.end)
           )
       ) ;
+      device.createRangedEGVStream(this, range.start, range.end)
+        .pipe(es.map(function (data, next) {
+          var fields = [ ];
+          ['system', 'display'].forEach(function (el) {
+            fields.push(data[el].toISOString( ));
+          });
+          ['glucose', 'trend_arrow', 'noise'].forEach(function (el) {
+            fields.push(data[el]);
+          });
+          next(null, fields.join(','));
+        }))
+        .pipe(es.writeArray(function (err, csvs) {
+          zip.addFile("egvdata.csv", new Buffer(csvs.join('\n')), 'egvdata');
+        }));;
+
     })
     .ReadDatabasePartitions(function (err, partitions) {
       console.log(partitions);
@@ -168,6 +186,12 @@ function inspect (device) {
       ) ;
       $('#tmp').text(partitions);
     })
+    .tap(function finish ( ) {
+      console.log("CLOSING");
+      var blob = new Blob([zip.toBuffer( )]);
+      saveAs(blob, name);
+    })
+    .close( );
     ;
 }
 
