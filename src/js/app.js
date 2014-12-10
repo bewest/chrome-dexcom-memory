@@ -161,7 +161,8 @@ function inspect (device) {
               .text(range.end)
           )
       ) ;
-      device.createRangedEGVStream(this, range.start, range.end)
+      dexcom.streamify.EGV(this, range.start, range.end)
+      // device.createRangedEGVStream(this, range.start, range.end)
         .pipe(es.map(function (data, next) {
           var fields = [ ];
           ['system', 'display'].forEach(function (el) {
@@ -176,6 +177,22 @@ function inspect (device) {
           zip.addFile("egvdata.csv", new Buffer(csvs.join('\n')), 'egvdata');
         }));;
 
+    })
+    this.getSensorPageRange(function (err, range) {
+      dexcom.streamify.Sensor(this, range.start, range.end)
+        .pipe(es.map(function (data, next) {
+          var fields = [ ];
+          ['system', 'display'].forEach(function (el) {
+            fields.push(data[el].toISOString( ));
+          });
+          ['unfiltered', 'filtered', 'rssi'].forEach(function (el) {
+            fields.push(data[el]);
+          });
+          next(null, fields.join(','));
+        }))
+        .pipe(es.writeArray(function (err, csvs) {
+          zip.addFile("sensordata.csv", new Buffer(csvs.join('\n')), 'sensordata');
+        }));;
     })
     .ReadDatabasePartitions(function (err, partitions) {
       console.log(partitions);
