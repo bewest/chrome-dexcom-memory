@@ -81,12 +81,14 @@ function do_zip_download ( ) {
 
 function poll (control) {
   var instr = $('.instruments');
+  var spinner = $('.workflow-spinner');
   function scanned (err, list) {
     if (!err) {
       instr.trigger('update', list);
     }
   }
   function poller ( ) {
+    spinner.toggleClass('fa-spin');
     serial.scan(scanned);
   }
   // var interval = setInterval(poller, 1000);
@@ -96,6 +98,7 @@ function poll (control) {
     if (!control.is(':checked')) {
       if (interval) {
         clearInterval(interval);
+        spinner.toggleClass('fa-spin', false);
         interval = null;
       }
     } else {
@@ -115,12 +118,14 @@ function do_updates (ev, list) {
     .clone(true)
     .removeClass('skeleton')
     .addClass('row')
+    .addClass('instru')
     ;
-  var rows = instr.selectAll('.row')
+  var rows = instr.selectAll('.row.instru')
     .data(list.ports);
   ;
   rows.enter( ).append(function (data, i) {
     var dup = cloned.clone(true);
+    dup.find('.device-status').removeClass('created pending done').addClass('created');
     dup.find('.device').text(data);
     // d3.select(this).append(d3.select(dup.get( )));
     console.log('each', data, i, this, dup.get( )[0]);
@@ -136,64 +141,88 @@ function inspect (device) {
 
   var row = $(device.dom);
   var zip = new Zip;
-  var name = "dexcom_download.zip";
+  var partStat = $('#partition_template>.db.status').clone(true).addClass('pages');
   this
+    /*
     .readHardwareBoard(function (err, header) {
-      row.append($("<section/>").addClass('hardwareboard').html(header));
+      row.append($("<section/>").addClass('hardwareboard hide').html(header));
     })
     .readFirmwareHeader(function (err, header) {
-      row.append($("<section/>").addClass('firmwareheader').html(header));
+      row.append($("<section/>").addClass('firmwareheader hide').html(header));
       console.log('header', header);
     })
+    */
     .getEGVPageRange(function (err, range) {
       console.log('RANGE', range);
-      row.append(
-        $('<section/>')
-          .addClass('range')
-          .append(
-            $('<tt/>')
-              .addClass('start')
-              .text(range.start)
-          )
-          .append(
-            $('<tt/>')
-              .addClass('end')
-              .text(range.end)
-          )
-      ) ;
-      dexcom.streamify.EGV(this, range.start, range.end)
-      // device.createRangedEGVStream(this, range.start, range.end)
-        .pipe(es.map(function (data, next) {
-          var fields = [ ];
-          ['system', 'display'].forEach(function (el) {
-            fields.push(data[el].toISOString( ));
-          });
-          ['glucose', 'trend_arrow', 'noise'].forEach(function (el) {
-            fields.push(data[el]);
-          });
-          next(null, fields.join(','));
-        }))
-        .pipe(es.writeArray(function (err, csvs) {
-          zip.addFile("egvdata.csv", new Buffer(csvs.join('\n')), 'egvdata');
-        }));;
+      var part = partStat.clone(true).addClass('egv');
+      part.find('.v.name').text('EGVData');
+      part.find('.v.outfile').text('EGVData.csv');
+      part.find('.v.range.start').text(range.start);
+      part.find('.v.currentPage').text(range.start);
+      part.find('.v.range.end').text(range.end);
+      part.find('.status_symbols').removeClass('created pending done').addClass('created');
+      row.find('.container.schedule').append(part);
+
+
+
+      part.data('streamName', 'EGV');
+      part.data('range', range);
+      part.data('columns', ['glucose', 'trend_arrow', 'noise']);
+      part.trigger('device.scheduled', range, 'EGV');
+      // scheduled
 
     })
-    this.getSensorPageRange(function (err, range) {
-      dexcom.streamify.Sensor(this, range.start, range.end)
-        .pipe(es.map(function (data, next) {
-          var fields = [ ];
-          ['system', 'display'].forEach(function (el) {
-            fields.push(data[el].toISOString( ));
-          });
-          ['unfiltered', 'filtered', 'rssi'].forEach(function (el) {
-            fields.push(data[el]);
-          });
-          next(null, fields.join(','));
-        }))
-        .pipe(es.writeArray(function (err, csvs) {
-          zip.addFile("sensordata.csv", new Buffer(csvs.join('\n')), 'sensordata');
-        }));;
+    .getSensorPageRange(function (err, range) {
+      var part = partStat.clone(true).addClass('sensor');
+      part.find('.v.name').text('SensorData');
+      part.find('.v.outfile').text('SensorData.csv');
+      part.find('.v.range.start').text(range.start);
+      part.find('.v.currentPage').text(range.start);
+      part.find('.v.range.end').text(range.end);
+      part.find('.status_symbols').removeClass('created pending done').addClass('created');
+      row.find('.container.schedule').append(part);
+
+
+
+      part.data('streamName', 'Sensor');
+      part.data('range', range);
+      part.data('columns', ['unfiltered', 'filtered', 'rssi']);
+      part.trigger('device.scheduled', range, 'Sensor');
     })
+    .loop(function do_scheduled_parts (end) {
+      var active = row.find('.db.pages .status_symbols.created:first');
+      if (active.is('.created')) {
+        var part = active.closest('.db.pages');
+        part.find('.status_symbols').removeClass('created pending done').addClass('pending');
+        var streamName = part.data('streamName');
+        var streamer = dexcom.streamify[streamName];
+        var range = part.data('range');
+        var info = {
+          name: part.find('.v.outfile').text( )
+        , notes: ['pages', range.end, 'through', range.stop, 'for', streamName ].join(" ")
+        , columns: part.data('columns')
+        };
+        streamer(this, range.start, range.end)
+          .on('progress', function onProgress (prog) {
+            // part.trigger('progress', prog);
+            part.find('.v.currentPage').text(prog.current);
+            part.find('.progress .bar').css('width', (prog.progress * 100).toString( ) + '%');
+          })
+          .pipe(csv_stream({columns: info.columns}))
+          .pipe(es.writeArray(function (err, csvs) {
+            zip.addFile(info.name, new Buffer(csvs.join('\n')), info.notes || info.name);
+            part.find('.status_symbols').removeClass('created pending done').addClass('done');
+            part.trigger('page.finished');
+          }));
+
+      } else {
+        end( );
+      }
+
+
+    })
+    /*
+    */
     .ReadDatabasePartitions(function (err, partitions) {
       console.log(partitions);
       row.append(
@@ -204,16 +233,39 @@ function inspect (device) {
       $('#tmp').text(partitions);
     })
     .tap(function finish ( ) {
-      console.log("CLOSING");
+      var name = row.find('.zipfile').text( ) || "dexcom_download.zip";
+      console.log("CLOSING", name);
       var blob = new Blob([zip.toBuffer( )]);
       saveAs(blob, name);
+      row.find('.device-status').removeClass('created pending done').addClass('done');
     })
-    .close( );
     ;
+}
+
+function csv_stream (opts) {
+  if (!opts) opts = { };
+  var head_fields = opts.head || [ 'system', 'display' ];
+  var body_fields = opts.columns;
+
+  function iter (data, next) {
+    var fields = [ ];
+    head_fields.forEach(function (el) {
+      fields.push(data[el].toISOString( ));
+    });
+    body_fields.forEach(function (el) {
+      fields.push(data[el]);
+    });
+    next(null, fields.join(','));
+  }
+
+  return es.map(iter);
+
 }
 
 function identify_device (ev, data, i) {
   console.log("identify_device", data, arguments, ev.target);
+  var target = $(ev.target);
+  target.find('.device-status').removeClass('created pending done').addClass('pending');
   var conn = serial.acquire(data, function opened (device) {
     console.log("HAHAHA opened DEV", device);
     var tx = dexcom(conn);
@@ -221,11 +273,30 @@ function identify_device (ev, data, i) {
     tx.api
       .ping(console.log.bind(console, 'PING'))
       .readFirmwareSettings(console.log.bind(console, 'readFirmwareSettings'))
+      .readManufacturingData(0, function (err, resp) {
+        tx.manufacturer = err || resp.json.pop( );
+        target.trigger('device.inspecting', tx);
+      })
       .tap(function ( ) {
         inspect.call(this, tx);
-    });
+    })
+    .tap(function finisher ( ) {
+    })
+    .close( );
+    ;
   });
   console.log('SERIAL', ser);
+}
+
+function stitch_manufacturer (ev, tx) {
+  var target = $(ev.target);
+  var xml = tx.manufacturer.xml;
+  var info = $('<section />').addClass('manufacturer hide').html(xml);
+  target.find('.xmlinfo')
+    .append(info);
+  info = info.find('manufacturingparameters');
+  var serial = info.attr('serialnumber');
+  target.find('.serial').text(serial);
 }
 
 function init ( ) {
@@ -236,6 +307,7 @@ function init ( ) {
   instr.on('update', do_updates);
   $(".v.switchcheck").bootstrapSwitch( );
   $('.instruments').on('detected', identify_device);
+  $('.instruments').on('device.inspecting', stitch_manufacturer);
   poll($('#auto_poll'));
 }
 $(window).ready(init);

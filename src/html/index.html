@@ -12,9 +12,25 @@
   <script type="text/javascript" src="/js/jquery.js" > </script>
   <link rel="stylesheet" href="/css/bootstrap.min.css" />
   <link rel="stylesheet" href="/css/bootstrap-switch.min.css" />
+  <link rel="stylesheet" href="/css/font-awesome.min.css" />
   <style type="text/css">
     .skeleton.template {
       display: none;
+    }
+    .device-status i,
+    .row .status_symbols i {
+      display: none;
+    }
+    .device-status.created .created,
+    .device-status.pending .pending,
+    .device-status.done .done {
+      display: inline;
+    }
+
+    .row .status_symbols.created .created,
+    .row .status_symbols.pending .pending,
+    .row .status_symbols.done .done {
+      display: inline;
     }
   </style>
   </head>
@@ -23,10 +39,10 @@
 
       <h1>Dexcom Inspector</h1>
 
-      <div>Hello, world!</div>
       <div class="instruments container-fluid">
         <fieldset>
           <label>Automatically detect devices
+            <i class="fa fa-cog fa-spin workflow-spinner"></i>
             <input type="checkbox" checked="checked" 
               id="auto_poll"
               class="v auto_poll switchcheck"
@@ -34,22 +50,67 @@
           </label>
         </fieldset>
         <div class="skeleton template">
+          <span class="device-status">
+              <i class="fa fa-upload created"></i>
+              <i class="fa fa-exchange pending"></i>
+              <i class="fa fa-check done"></i>
+          </span>
           <tt class="device"></tt>
-          <div class="progress">
-            <div class="progress-bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 60%;">
+          <span class="zipfile"><tt>dexcom_</tt><tt class="serial"></tt><tt>_receiver.zip</tt></span>
+          <tt class="filename"></tt>
+          <div class="container schedule">
+          <div class="hide progress" style="width: 40%;">
+            <div class="bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">
               <span class="sr-only">60% Complete</span>
             </div>
           </div>
+          </div>
+          <section class="xmlinfo hide">
+          </section>
         </div>
       </div>
-      <div>
+      <div id="partition_template" class="container well hide">
+          <div class="db status">
+            <span class="status_symbols">
+              <i class="fa fa-spinner fa-spin pending"></i>
+              <i class="fa fa-exchange"></i>
+              <i class="fa fa-upload created"></i>
+              <i class="fa fa-square-o "></i>
+              <i class="fa fa-file-o"></i>
+              <i class="fa fa-file"></i>
+              <i class="fa fa-check done"></i>
+            </span>
+            <span class="label">
+              <tt class="v name">PartName</tt>
+            </span>
+            <tt class="v outfile">PartName.csv</tt>
+            <div class="prog_indicator clearfix">
+              <div class="pull-left">
+                <span class="badge">
+                  <tt class="v currentPage">2</tt>
+                </span>
+              </div>
+              <div class="pull-left">
+                <span class="badge">
+                  <tt class="v range start">0</tt>/
+                  <tt class="v range end">230</tt>
+                </span>
+              </div>
+              <div class="progress pull-left" style="width: 300px;">
+                <div class="bar" role="progressbar" aria-valuenow="60" aria-valuemin="0" aria-valuemax="100" style="width: 0%;">
+                </div>
+              </div>
+            </div>
+          </div>
+      </div>
+      <div style="display: none;">
         <pre id="tmp">
         stuff,one,two
         </pre>
         <button id="download_1">Download</button>
         <button id="download_2">Download Zip</button>
       </div>
-      <div>Hello, world!
+      <div>
         <ol id="history">
           <li class="skeleton template">
             <tt class="v path">/path</tt>

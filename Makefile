@@ -7,7 +7,7 @@ clean:
 
 build:
 	# hi
-	mkdir -p build/js build/css build/html build/images
+	mkdir -p build/js build/css build/html build/images build/fonts
 	# ${BROWSERIFY} -r dexcom-uart -r serial-chromeify -o build/js/dexcom.js
 	${BROWSERIFY} -r browserify-jquery:jquery  -r ./bower_components/bootstrap-switch/dist/js/bootstrap-switch.min.js:bootstrap-switch > build/js/jquery.js
 	# ${BROWSERIFY} -r adm-zip  > build/js/adm-zip.js
@@ -23,6 +23,8 @@ build:
 	cp src/css/* build/css/
 	cp bower_components/solarized/css/solarized.css build/css/
 	cp bower_components/bootstrap-switch/dist/css/bootstrap3/bootstrap-switch.min.css build/css/
+	cp bower_components/font-awesome/css/font-awesome.min.css build/css/
+	cp bower_components/font-awesome/fonts/* build/fonts/
 	cp src/images/* build/images/
 
 .PHONY: build
